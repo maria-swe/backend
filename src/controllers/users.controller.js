@@ -2,8 +2,9 @@ import { User } from '../models/user.js';
 import { Task } from '../models/task.js';
 import { Status } from '../constants/index.js';
 import { encriptar } from '../common/bcrypt.js';
+import { Op } from 'sequelize';
 
-async function getUsers(req, res, next) {
+async function getUsers1(req, res, next) {
   try {
     const users = await User.findAll({
       attributes: ['id', 'username', 'password', 'status'],
@@ -12,7 +13,7 @@ async function getUsers(req, res, next) {
         status: Status.ACTIVE,
       },
     });
-    res.json(users);
+    return res.json(users);
   } catch (error) {
     next(error);
   }
@@ -25,7 +26,7 @@ async function createUser(req, res, next) {
       username,
       password,
     });
-    res.json(user);
+    return res.json(user);
   } catch (error) {
     next(error);
   }
@@ -40,8 +41,8 @@ async function getUser(req, res, next) {
         id,
       },
     });
-    if (!user) res.status(404).json({ message: 'User not found' });
-    res.json(user);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    return res.json(user);
   } catch (error) {
     next(error);
   }
@@ -57,6 +58,7 @@ async function updateUser(req, res, next) {
         .json({ message: 'Username or password is required' });
     }
 
+    // TODO: revisar ya q esto deberia ser automático
     const passwordEncriptado = await encriptar(password);
 
     const user = await User.update(
@@ -71,7 +73,7 @@ async function updateUser(req, res, next) {
       }
     );
 
-    res.json(user);
+    return res.json(user);
   } catch (error) {
     next(error);
   }
@@ -85,7 +87,7 @@ async function deleteUser(req, res, next) {
         id,
       },
     });
-    res.status(204).json({ message: 'User deleted' });
+    return res.status(204).json({ message: 'User deleted' });
   } catch (error) {
     next(error);
   }
@@ -95,18 +97,18 @@ async function activateInactivate(req, res, next) {
   const { id } = req.params;
   const { status } = req.body;
   try {
-    if (!status) res.status(400).json({ message: 'Status is required' });
+    if (!status) return res.status(400).json({ message: 'Status is required' });
 
     const user = await User.findByPk(id);
 
-    if (!user) res.status(404).json({ message: 'User not found' });
+    if (!user) return res.status(404).json({ message: 'User not found' });
 
     if (user.status === status)
-      res.status(409).json({ message: 'Same status' });
+      return res.status(409).json({ message: 'Same status' });
 
     user.status = status;
     await user.save();
-    res.json(user);
+    return res.json(user);
   } catch (error) {
     next(error);
   }
@@ -130,11 +132,45 @@ async function getTasks(req, res, next) {
       id
     }
    })
-    res.json(user);
+    return res.json(user);
   } catch (error) {
     next(error);
   }
 }
+
+async function getUsers(req, res) {
+ const { page, limit, orderBy, orderDir = 'DESC', search } = req.query;
+ const order =
+   orderBy && orderDir ? [[orderBy, orderDir.toUpperCase()]] : [['id', 'ASC']]; // Orden por defecto
+ const where = {};
+ if (search) {
+   where.username = {
+     [Op.iLike]: `%${search}%`,
+   };
+ }
+
+
+ try {
+   const users = await User.findAndCountAll({
+     attributes: ['id', 'username', 'status'],
+     where: Object.keys(where).length > 0 ? where : undefined,
+     limit,
+     offset: (page - 1) * limit,
+     order,
+   });
+
+
+   return res.json({
+     total: users.count,
+     page: parseInt(page),
+     pages: Math.ceil(users.count / limit),
+     data: users.rows,
+   });
+ } catch (error) {
+   return res.status(500).json({ message: error.message });
+ }
+}
+
 
 export default {
   getUsers,
@@ -143,5 +179,5 @@ export default {
   updateUser,
   deleteUser,
   activateInactivate,
-  getTasks
+  getTasks,
 };
