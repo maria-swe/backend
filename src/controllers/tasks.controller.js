@@ -1,4 +1,5 @@
 import { Task } from '../models/task.js';
+import { Op } from 'sequelize';
 
 async function getTasks(req, res) {
   let {
@@ -7,13 +8,14 @@ async function getTasks(req, res) {
     orderBy = 'id',
     orderDir = 'DESC',
     search = '',
+    done = null,
   } = req.query;
 
   page = parseInt(page);
   limit = parseInt(limit);
 
   if (isNaN(page) || page < 1) page = 1;
-  if (isNaN(limit) || limit < 1) limit = 10;
+  if (isNaN(limit) || limit < 1) limit = 5;
 
   const { userId } = req.user;
 
@@ -29,6 +31,8 @@ async function getTasks(req, res) {
       [Op.iLike]: `%${search.trim()}%`,
     };
   }
+
+  if (done) where.done = done === 'true';
 
   try {
     const tasks = await Task.findAndCountAll({
