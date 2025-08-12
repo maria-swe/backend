@@ -10,7 +10,7 @@ export function authenticateToken(req, res, next) {
 
   // verificamos y decodificamos el token
   jwt.verify(token, config.JWT_SECRET, (err, user) => {
-    if (err) return res.sendStatus(403);
+    if (err) return res.sendStatus(401);
     req.user = user;
     next();
   });
