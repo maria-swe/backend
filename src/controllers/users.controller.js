@@ -117,21 +117,21 @@ async function activateInactivate(req, res, next) {
 async function getTasks(req, res, next) {
   const { id } = req.params;
   try {
-   const user = await User.findOne({
-    attributes: ['username'],
-    include: [
-      {
-        model: Task,
-        attributes: ['name', 'done'],
-        /* where: {
+    const user = await User.findOne({
+      attributes: ['username'],
+      include: [
+        {
+          model: Task,
+          attributes: ['name', 'done'],
+          /* where: {
           done: false
         } */
-      }
-    ],
-    where: {
-      id
-    }
-   })
+        },
+      ],
+      where: {
+        id,
+      },
+    });
     return res.json(user);
   } catch (error) {
     next(error);
@@ -139,38 +139,47 @@ async function getTasks(req, res, next) {
 }
 
 async function getUsers(req, res) {
- const { page, limit, orderBy, orderDir = 'DESC', search } = req.query;
- const order =
-   orderBy && orderDir ? [[orderBy, orderDir.toUpperCase()]] : [['id', 'ASC']]; // Orden por defecto
- const where = {};
- if (search) {
-   where.username = {
-     [Op.iLike]: `%${search}%`,
-   };
- }
+  const { page, limit, orderBy, orderDir = 'DESC', search, status } = req.query;
+  const order =
+    orderBy && orderDir ? [[orderBy, orderDir.toUpperCase()]] : [['id', 'ASC']]; // Orden por defecto
+  const where = {};
+  if (search) {
+    where.username = {
+      [Op.iLike]: `%${search}%`,
+    };
+  }
 
+  if (status) {
+    console.log('stat', status)
+    if (status !== Status.ACTIVE && status !== Status.INACTIVE)
+      return res.status(400).json({
+        message: `Invalid status, must be ${Status.ACTIVE} or ${Status.INACTIVE}`,
+      });
+    where.status = {
+      [Op.iLike]: `${status}`,
+    };
+    where.status = status;
+  }
 
- try {
-   const users = await User.findAndCountAll({
-     attributes: ['id', 'username', 'status'],
-     where: Object.keys(where).length > 0 ? where : undefined,
-     limit,
-     offset: (page - 1) * limit,
-     order,
-   });
+  try {
+    const users = await User.findAndCountAll({
+      attributes: ['id', 'username', 'status'],
+      where: Object.keys(where).length > 0 ? where : undefined,
+      limit,
+      offset: (page - 1) * limit,
+      order,
+    });
 
-
-   return res.json({
-     total: users.count,
-     page: parseInt(page),
-     pages: Math.ceil(users.count / limit),
-     data: users.rows,
-   });
- } catch (error) {
-   return res.status(500).json({ message: error.message });
- }
+    return res.json({
+      total: users.count,
+      page: parseInt(page),
+      pages: Math.ceil(users.count / limit),
+      data: users.rows,
+    });
+  } catch (error) {
+    next(error);
+  }
 }
-
 
 export default {
   getUsers,
